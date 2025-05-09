@@ -65,10 +65,6 @@ const unsigned char epd_bitmap_qrcode_2 [] PROGMEM = {
 };
 
 
-
-
-
-
 // Items
 struct Item {
   String name;

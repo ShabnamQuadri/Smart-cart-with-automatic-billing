@@ -1,0 +1,233 @@
+#include <Wire.h>
+#include <SPI.h>
+#include <MFRC522.h>
+#include <LiquidCrystal_I2C.h>
+#include <U8g2lib.h>
+#include <WiFi.h>
+#include <WebServer.h>
+
+// OLED Setup (I2C)
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+
+// LCD Setup (I2C)
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// RFID Setup
+#define SS_PIN 5
+#define RST_PIN 27
+MFRC522 mfrc522(SS_PIN, RST_PIN);
+
+// Buttons
+#define ADD_BUTTON 13
+#define REMOVE_BUTTON 12
+#define TOTAL_BUTTON 14
+
+int bill_amount = 0;
+bool add_flag = true;
+bool remove_flag = false;
+
+unsigned long lastScanTime = 0;
+const unsigned long scanCooldown = 1000;
+unsigned long lastButtonTime = 0;
+const unsigned long buttonCooldown = 300;
+
+// QR Bitmap (placeholder - insert your QR bitmap data here)
+const unsigned char epd_bitmap_qrcode_2 [] PROGMEM = {
+  // your full QR code bitmap data goes here
+};
+
+// Items
+struct Item {
+  String name;
+  String uid;
+  int price;
+};
+
+const int itemCount = 5;
+Item items[itemCount] = {
+  {"Milk", "A3 1A 64 29", 63},
+  {"Eggs", "43 60 B8 27", 55},
+  {"Butter", "13 12 C7 27", 60},
+  {"Milk Bread", "93 AD BD 27", 21},
+  {"Cookie", "62 FA 13 51", 100}
+};
+
+// WiFi
+const char* ssid = "iPhone";
+const char* password = "32324554";
+WebServer server(80);
+
+// Bill struct
+struct CartItem {
+  String name;
+  int price;
+  int quantity;
+};
+
+CartItem cart[itemCount];
+int cartSize = 0;
+
+void setup() {
+  Serial.begin(115200);
+  SPI.begin();
+  mfrc522.PCD_Init();
+
+  Wire.begin();
+  lcd.init();
+  lcd.backlight();
+  oled.begin();
+
+  pinMode(ADD_BUTTON, INPUT);
+  pinMode(REMOVE_BUTTON, INPUT);
+  pinMode(TOTAL_BUTTON, INPUT);
+
+  lcd.setCursor(0, 0);
+  lcd.print("Welcome to");
+  lcd.setCursor(0, 1);
+  lcd.print("Smart Cart");
+  delay(2000);
+  lcd.clear();
+
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nConnected! IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", handleRoot);
+  server.begin();
+}
+
+void loop() {
+  unsigned long currentTime = millis();
+  server.handleClient();
+
+  if (digitalRead(ADD_BUTTON) && currentTime - lastButtonTime > buttonCooldown) {
+    add_flag = true;
+    remove_flag = false;
+    displayLCD("Scan Item", "to ADD");
+    lastButtonTime = currentTime;
+  }
+
+  if (digitalRead(REMOVE_BUTTON) && currentTime - lastButtonTime > buttonCooldown) {
+    add_flag = false;
+    remove_flag = true;
+    displayLCD("Scan Item", "to REMOVE");
+    lastButtonTime = currentTime;
+  }
+
+  if (digitalRead(TOTAL_BUTTON) && currentTime - lastButtonTime > buttonCooldown) {
+    displayLCD("Total:", String(bill_amount) + " Rs");
+    showQRCode();
+    lastButtonTime = currentTime;
+  }
+
+  if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) return;
+  if (millis() - lastScanTime < scanCooldown) return;
+  lastScanTime = millis();
+
+  String uidStr = "";
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    uidStr += (mfrc522.uid.uidByte[i] < 0x10 ? "0" : "") + String(mfrc522.uid.uidByte[i], HEX) + " ";
+  }
+  uidStr.trim();
+  uidStr.toUpperCase();
+
+  for (int i = 0; i < itemCount; i++) {
+    if (uidStr == items[i].uid) {
+      bool found = false;
+      for (int j = 0; j < cartSize; j++) {
+        if (cart[j].name == items[i].name) {
+          found = true;
+          if (add_flag) {
+            cart[j].quantity++;
+            bill_amount += items[i].price;
+            displayLCD(items[i].name, "Added");
+          } else if (remove_flag && cart[j].quantity > 0) {
+            cart[j].quantity--;
+            bill_amount -= items[i].price;
+            if (cart[j].quantity == 0) {
+              for (int k = j; k < cartSize - 1; k++) {
+                cart[k] = cart[k + 1];
+              }
+              cartSize--;
+            }
+            displayLCD(items[i].name, "Removed");
+          } else if (remove_flag && cart[j].quantity == 0) {
+            displayLCD("Item not", "added");
+          }
+          updateOLEDTotal();
+          return;
+        }
+      }
+
+      if (!found && add_flag) {
+        cart[cartSize].name = items[i].name;
+        cart[cartSize].price = items[i].price;
+        cart[cartSize].quantity = 1;
+        cartSize++;
+        bill_amount += items[i].price;
+        displayLCD(items[i].name, "Added");
+        updateOLEDTotal();
+        return;
+      } else if (!found && remove_flag) {
+        displayLCD("Item not", "added");
+        updateOLEDTotal();
+        return;
+      }
+    }
+  }
+}
+
+void displayLCD(String line1, String line2) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(line1);
+  lcd.setCursor(0, 1);
+  lcd.print(line2);
+}
+
+void updateOLEDTotal() {
+  oled.clearBuffer();
+  oled.setFont(u8g2_font_ncenB08_tr);
+  oled.drawStr(0, 24, "Total:");
+  oled.setCursor(50, 24);
+  oled.print(bill_amount);
+  oled.sendBuffer();
+}
+
+void showQRCode() {
+  oled.clearBuffer();
+  oled.drawXBMP(32, 0, 64, 64, epd_bitmap_qrcode_2);
+  oled.sendBuffer();
+}
+
+void handleRoot() {
+  String html = "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='1'><title>Smart Cart Bill</title>";
+  html += "<style>";
+  html += "body { font-family: Arial; text-align: center; background-color: #f2f2f2; padding: 20px; }";
+  html += "table { margin: auto; border-collapse: collapse; width: 70%; background-color: white; }";
+  html += "th, td { padding: 12px; border: 1px solid #888; font-size: 16px; }";
+  html += "th { background-color: #4CAF50; color: white; }";
+  html += ".btn { background-color: #28a745; color: white; padding: 12px 25px; font-size: 18px; border: none; margin: 10px; border-radius: 5px; cursor: pointer; }";
+  html += ".btn:hover { background-color: #218838; }";
+  html += "</style></head><body>";
+  html += "<h2>🛒 Smart Cart Bill</h2>";
+  html += "<table><tr><th>Item</th><th>Price</th><th>Qty</th><th>Subtotal</th></tr>";
+
+  for (int i = 0; i < cartSize; i++) {
+    int subtotal = cart[i].price * cart[i].quantity;
+    html += "<tr><td>" + cart[i].name + "</td><td>" + String(cart[i].price) + "</td><td>" + String(cart[i].quantity) + "</td><td>" + String(subtotal) + "</td></tr>";
+  }
+
+  html += "<tr><td colspan='3'><strong>Total</strong></td><td><strong>" + String(bill_amount) + "</strong></td></tr>";
+  html += "</table>";
+  html += "<button class='btn' onclick='window.print()'>Print Bill</button>";
+  html += "<button class='btn'>Pay Now</button>";
+  html += "</body></html>";
+
+  server.send(200, "text/html", html);
+}

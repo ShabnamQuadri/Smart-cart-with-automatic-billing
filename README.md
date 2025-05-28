@@ -1,57 +1,89 @@
+# 🛒 Smart Cart with Automatic Billing System
 
-📦 Smart Cart with Automatic Billing System
-A Smart Cart system designed using ESP32, RFID, OLED, and LCD that automates billing in retail environments. This project aims to reduce human effort, eliminate queues, and enhance user convenience during shopping.
+## 🎯 **Project Overview**
+This is a real-time automated billing system built using the **ESP32 microcontroller**, an **RFID reader (MFRC522)**, an **OLED display**, an **I2C LCD**, and **push buttons**. It allows customers to **add/remove items using RFID tags** and calculates the total instantly—**eliminating the need for manual billing or cashier interaction**.
 
-🔧 Components Used
-Component	Quantity	Description
-ESP32 Dev Kit	1	Main controller with Wi-Fi & Bluetooth
-RFID Reader (MFRC522)	1	Scans RFID tags for product identification
-RFID Tags	n	Each tag represents an item
-OLED Display (SSD1306)	1	128x64 display for total amount
-I2C LCD Display (16x2)	1	For user messages
-Push Buttons	3	Add, Remove, and Show Total buttons
-Breadboard + Wires	-	For circuit connection
-Power Supply	1	3.3V regulated (from ESP32)
+---
 
-🔌 Pin Connections
-Component	Signal	ESP32 Pin
-RFID (MFRC522)	SDA (SS)	D19
-SCK	D23
-MOSI	D21
-MISO	D22
-RST	D18
-OLED (I2C)	SDA	D4
-SCL	D5
-I2C LCD (16x2)	SDA	D4 (shared)
-SCL	D5 (shared)
-Push Buttons	Add Button	D12
-Remove Button	D13
-Total Button	D14
-Power & Ground	VCC (All modules)	3.3V
-GND (All modules)	GND
+## 🛠️ **How It Works**
+- Each item is tagged with an **RFID tag** that contains a unique ID.
+- When the tag is brought near the **RFID reader (MFRC522)**, the **UID is read and matched** with a product.
+- The **ESP32** processes this data, and:
+  - The **OLED Display (SSD1306)** shows the **current total price**.
+  - The **I2C LCD** displays **status messages** (`Item Added`, `Removed`, etc.).
+- Three push buttons allow the user to:
+  - **Add** an item.
+  - **Remove** an item.
+  - **Show Total** for billing.
+- The system **updates displays and memory in real time**.
 
-Note: OLED and I2C LCD both share I2C bus (SDA/SCL).
+---
 
-⚙️ Working Principle
-Product Scanning: Each item is assigned an RFID tag. When placed near the RFID reader, the tag is scanned.
+## 💡 **Features**
+- ✅ Real-time item tracking and total price updates  
+- 🖥️ Dual display (OLED + LCD) for better user interaction  
+- 🔘 Push-button interface for full user control  
+- 🚫 No need for a cashier or manual input  
+- 📱 Easily expandable with Wi-Fi, payment, or mobile app support  
 
-Cart Management: The user can add or remove items using the respective buttons.
+---
 
-Display:
+## 🧰 **Components Used**
 
-OLED: Shows the running total of added items.
+| **Component**            | **Description**                        |
+|--------------------------|----------------------------------------|
+| ESP32 Dev Kit Module     | Main microcontroller with Wi-Fi + Bluetooth |
+| MFRC522 RFID Reader      | Reads RFID tags                        |
+| SSD1306 OLED Display     | Shows total price                      |
+| 16x2 I2C LCD Display     | Shows messages/status                  |
+| Push Buttons (x3)        | Add / Remove / Show Total              |
+| RFID Tags                | Unique tag per item                    |
+| Breadboard + Jumper Wires | For wiring                             |
 
-LCD: Displays current action/status messages.
+---
 
-Billing: On pressing the 'Total' button, the complete amount is shown.
+## 🔌 **Wiring Overview**
 
-All operations are managed in real-time by the ESP32.
+### 🔗 **RFID MFRC522 to ESP32 (SPI Interface)**
 
-✅ Features
-Real-time item addition/removal.
+| **MFRC522 Pin** | **ESP32 Pin** |
+|------------------|---------------|
+| SDA              | D19           |
+| SCK              | D23           |
+| MOSI             | D21           |
+| MISO             | D22           |
+| RST              | D18           |
+| 3.3V             | 3.3V          |
+| GND              | GND           |
 
-Dual-display output (item status + total price).
+---
 
-Simple UI using buttons.
+### 🖥️ **OLED Display (I2C - SSD1306) and 16x2 LCD (I2C)**
 
-No manual billing or cashier required
+| **I2C Pin** | **ESP32 Pin** |
+|-------------|---------------|
+| SDA         | D4            |
+| SCL         | D5            |
+| VCC         | 3.3V          |
+| GND         | GND           |
+
+> **Note**: Both OLED and LCD share the **same I2C lines** (SDA & SCL).
+
+---
+
+### 🔘 **Push Buttons**
+
+| **Button**     | **ESP32 GPIO** |
+|----------------|----------------|
+| Add Item       | D12            |
+| Remove Item    | D13            |
+| Show Total     | D14            |
+
+---
+
+## ✅ **Advantages**
+- 📶 Contactless billing system  
+- ⏱️ Reduces queue and billing time  
+- 💸 Modular, low-cost design using open-source hardware  
+- 🖥️ Dual display for enhanced UI/UX  
+- 🔄 Supports real-time updates and offline operation  
